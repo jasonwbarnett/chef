@@ -39,6 +39,7 @@ class Chef
         @startup_type = :automatic
         @run_as_user = ""
         @run_as_password = ""
+        @delayed = false
       end
 
       def startup_type(arg = nil)
@@ -64,6 +65,14 @@ class Chef
           :run_as_password,
           arg,
           :kind_of => [ String ]
+        )
+      end
+
+      def delayed(arg = nil)
+        set_or_return(
+          :delayed,
+          arg,
+          :kind_of => [ Boolean ]
         )
       end
     end
