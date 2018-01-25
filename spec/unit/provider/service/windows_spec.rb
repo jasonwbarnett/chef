@@ -219,32 +219,139 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
     expect(provider.load_current_resource).to equal(provider.current_resource)
   end
 
-  it "sets the current resources status" do
-    provider.load_current_resource
-    expect(provider.current_resource.running).to be_truthy
-  end
-
   it "sets the current resources start type" do
     provider.load_current_resource
     expect(provider.current_resource.enabled).to be_truthy
   end
 
-  it "does not set the current resources start type if it is neither AUTO START or DISABLED" do
-    allow(Win32::Service).to receive(:config_info).with(new_resource.service_name).and_return(
-      double("Struct::ServiceConfigInfo",
-        service_type: 'share process',
-        start_type: 'demand start',
-        error_control: 'normal',
-        binary_path_name: 'C:\\Windows\\system32\\svchost.exe -k LocalServiceNetworkRestricted',
-        load_order_group: 'TDI',
-        tag_id: 0,
-        dependencies: %w(NSI Tdx Afd),
-        service_start_name: 'NT Authority\\LocalService',
-        display_name: 'DHCP Client'
-      ))
-    provider.load_current_resource
-    expect(provider.current_resource.enabled).to be_nil
+  context "service does not exist" do
+    before do
+      allow(Win32::Service).to receive(:exists?).with(anything).and_return(false)
+    end
+
+    %w(running enabled startup_type error_control binary_path_name
+      load_order_group dependencies run_as_user display_name ).each do |prop|
+        it  "does not set #{prop}" do
+          expect(provider.current_resource.running).to be_nil
+        end
+      end
   end
+
+  context "service exists" do
+    before do
+      allow(Win32::Service).to receive(:config_info).with(new_resource.service_name).and_return(
+        double("Struct::ServiceConfigInfo",
+          service_type: 'share process',
+          start_type: 'demand start',
+          error_control: 'normal',
+          binary_path_name: 'C:\\Windows\\system32\\svchost.exe -k LocalServiceNetworkRestricted',
+          load_order_group: 'TDI',
+          tag_id: 0,
+          dependencies: %w(NSI Tdx Afd),
+          service_start_name: 'NT Authority\\LocalService',
+          display_name: 'DHCP Client'
+        ))
+    end
+
+    context 'start type is neither AUTO START or DISABLED' do
+      before do
+        allow(Win32::Service).to receive(:config_info).with(new_resource.service_name).and_return(
+          double("Struct::ServiceConfigInfo",
+            service_type: 'share process',
+            start_type: 'demand start',
+            error_control: 'normal',
+            binary_path_name: 'C:\\Windows\\system32\\svchost.exe -k LocalServiceNetworkRestricted',
+            load_order_group: 'TDI',
+            tag_id: 0,
+            dependencies: %w(NSI Tdx Afd),
+            service_start_name: 'NT Authority\\LocalService',
+            display_name: 'DHCP Client'
+          ))
+      end
+
+      it "does not set the current resources enabled" do
+        provider.load_current_resource
+        expect(provider.current_resource.enabled).to be_nil
+      end
+    end
+
+    it "sets the current resources state to running if it's running" do
+      allow(Win32::Service).to receive(:status).with(anything).and_return(
+        double("StatusStruct", :current_state => "running"))
+      provider.load_current_resource
+      expect(provider.current_resource.running).to be_truthy
+    end
+
+    it "sets startup_type" do
+      expect(provider.current_resource.startup_type).to be_truthy
+    end
+
+    it "sets error_control" do
+      provider.load_current_resource
+      expect(provider.current_resource.error_control).to be_truthy
+    end
+
+    it "sets binary_path_name" do
+      provider.load_current_resource
+      expect(provider.current_resource.binary_path_name).to be_truthy
+    end
+
+    it "sets load_order_group" do
+      provider.load_current_resource
+      expect(provider.current_resource.load_order_group).to be_truthy
+    end
+
+    it "sets dependencies" do
+      provider.load_current_resource
+      expect(provider.current_resource.dependencies).to be_truthy
+    end
+
+    it "sets run_as_user" do
+      provider.load_current_resource
+      expect(provider.current_resource.run_as_user).to be_truthy
+    end
+
+    it "sets display_name" do
+      provider.load_current_resource
+      expect(provider.current_resource.display_name).to be_truthy
+    end
+
+    context "delayed start" do
+      it "sets delayed start" do
+        provider.load_current_resource
+        expect(provider.current_resource.delayed_start).to be_truthy
+      end
+    end
+  end
+
+  # current_resource.service_name(new_resource.service_name) // DONE
+  #
+  # if Win32::Service.exists?(current_resource.service_name)
+  #   current_resource.running(current_state == RUNNING)
+  #   Chef::Log.debug "#{new_resource} running: #{current_resource.running}"
+  #   case current_start_type
+  #   when AUTO_START
+  #     current_resource.enabled(true)
+  #   when DISABLED
+  #     current_resource.enabled(false)
+  #   end
+  #   Chef::Log.debug "#{new_resource} enabled: #{current_resource.enabled}"
+  #
+  #   config_info = Win32::Service.config_info(current_resource.service_name)
+  #   current_resource.service_type(get_service_type(config_info.service_type))    if config_info.service_type
+  #   current_resource.startup_type(get_start_type(config_info.start_type))        if config_info.start_type
+  #   current_resource.error_control(get_error_control(config_info.error_control)) if config_info.error_control
+  #   current_resource.binary_path_name(config_info.binary_path_name) if config_info.binary_path_name
+  #   current_resource.load_order_group(config_info.load_order_group) if config_info.load_order_group
+  #   current_resource.dependencies(config_info.dependencies)         if config_info.dependencies
+  #   current_resource.run_as_user(config_info.service_start_name)    if config_info.service_start_name
+  #   current_resource.display_name(config_info.display_name)         if config_info.display_name
+  #
+  #   if delayed_start = current_delayed_start
+  #     current_resource.delayed_start(delayed_start)
+  #   end
+  # end
+
 
   describe Chef::Provider::Service::Windows, "start_service" do
     before(:each) do
