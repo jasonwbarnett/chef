@@ -275,11 +275,16 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
       end
     end
 
-    it "sets the current resources state to running if it's running" do
-      allow(Win32::Service).to receive(:status).with(anything).and_return(
-        double("StatusStruct", :current_state => "running"))
+    it "sets the current resources running to true if it's running" do
+      allow(provider).to receive(:current_state).and_return("running")
       provider.load_current_resource
-      expect(provider.current_resource.running).to be_truthy
+      expect(provider.current_resource.running).to be true
+    end
+
+    it "sets the current resources running to false if it's in any other state" do
+      allow(provider).to receive(:current_state).and_return("other state")
+      provider.load_current_resource
+      expect(provider.current_resource.running).to be false
     end
 
     it "sets startup_type" do
