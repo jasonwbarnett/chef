@@ -62,7 +62,7 @@ class Chef
       #   - :manual
       #   - :disabled
       # Reference: https://github.com/djberg96/win32-service/blob/ffi/lib/win32/windows/constants.rb#L49-L54
-      property :startup_type, Integer, default: SERVICE_AUTO_START, coerce: proc { |x|
+      property :startup_type, [Integer, String, Symbol], default: SERVICE_AUTO_START, coerce: proc { |x|
         if x.is_a?(Integer)
           x
         elsif x.is_a?(String) or x.is_a?(Symbol)

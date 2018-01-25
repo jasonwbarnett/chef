@@ -67,14 +67,14 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
       Chef::Log.debug "#{new_resource} enabled: #{current_resource.enabled}"
 
       config_info = Win32::Service.config_info(current_resource.service_name)
-      current_resource.service_type(get_service_type(config_info[:service_type]))    if config_info[:service_type]
-      current_resource.startup_type(get_start_type(config_info[:start_type]))        if config_info[:start_type]
-      current_resource.error_control(get_error_control(config_info[:error_control])) if config_info[:error_control]
-      current_resource.binary_path_name(config_info[:binary_path_name]) if config_info[:binary_path_name]
-      current_resource.load_order_group(config_info[:load_order_group]) if config_info[:load_order_group]
-      current_resource.dependencies(config_info[:dependencies])         if config_info[:dependencies]
-      current_resource.run_as_user(config_info[:service_start_name])    if config_info[:service_start_name]
-      current_resource.display_name(config_info[:display_name])         if config_info[:display_name]
+      current_resource.service_type(get_service_type(config_info.service_type))    if config_info.service_type
+      current_resource.startup_type(get_start_type(config_info.start_type))        if config_info.start_type
+      current_resource.error_control(get_error_control(config_info.error_control)) if config_info.error_control
+      current_resource.binary_path_name(config_info.binary_path_name) if config_info.binary_path_name
+      current_resource.load_order_group(config_info.load_order_group) if config_info.load_order_group
+      current_resource.dependencies(config_info.dependencies)         if config_info.dependencies
+      current_resource.run_as_user(config_info.service_start_name)    if config_info.service_start_name
+      current_resource.display_name(config_info.display_name)         if config_info.display_name
 
       if delayed_start = current_delayed_start
         current_resource.delayed_start(delayed_start)
@@ -261,7 +261,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
 
   def action_configure_startup
     case @new_resource.startup_type
-    when :automatic
+    when SERVICE_AUTO_START
       if current_start_type != AUTO_START
         converge_by("set service #{@new_resource} startup type to automatic") do
           set_startup_type(:automatic)
@@ -269,7 +269,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
       else
         Chef::Log.debug("#{@new_resource} startup_type already automatic - nothing to do")
       end
-    when :manual
+    when SERVICE_DEMAND_START
       if current_start_type != MANUAL
         converge_by("set service #{@new_resource} startup type to manual") do
           set_startup_type(:manual)
@@ -277,7 +277,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
       else
         Chef::Log.debug("#{@new_resource} startup_type already manual - nothing to do")
       end
-    when :disabled
+    when SERVICE_DISABLED
       if current_start_type != DISABLED
         converge_by("set service #{@new_resource} startup type to disabled") do
           set_startup_type(:disabled)
@@ -419,7 +419,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
       SERVICE_KERNEL_DRIVER
     when 'own process'
       SERVICE_WIN32_OWN_PROCESS
-    when 'share proces'
+    when 'share process'
       SERVICE_WIN32_SHARE_PROCESS
     when 'recognizer driver'
       SERVICE_RECOGNIZER_DRIVER
@@ -434,7 +434,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
     when 'share process, interactive'
       SERVICE_INTERACTIVE_PROCESS | SERVICE_WIN32_SHARE_PROCESS
     else
-      nil
+      raise("Unsupported service type, #{service_type}. Submit bug request to fix.")
     end
   end
 
@@ -451,7 +451,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
     when 'system start'
       SERVICE_SYSTEM_START
     else
-      nil
+      raise("Unsupported start type, #{start_type}. Submit bug request to fix.")
     end
   end
 
