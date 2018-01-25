@@ -26,6 +26,54 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
   include_context "Win32"
 
   let(:new_resource) { Chef::Resource::WindowsService.new("chef") }
+
+  # Actual response from Win32::Service.config_info('chef-client')
+  let(:chef_service_config_info) do
+    double('Struct::ServiceConfigInfo',
+      service_type: 'own process',
+      start_type: 'auto start',
+      error_control: 'ignore',
+      binary_path_name: 'C:\\opscode\\chef\\embedded\\bin\\ruby.exe C:\\opscode\\chef\\bin\\chef-windows-service',
+      load_order_group: '',
+      tag_id: 0,
+      dependencies: ['Winmgmt'],
+      service_start_name: 'LocalSystem',
+      display_name: 'Chef Client Service',
+    )
+  end
+
+  # Actual response from Win32::Service.services
+  let(:chef_service_info) do
+    double('Struct::ServiceInfo',
+      service_name: 'chef-client',
+      display_name: 'Chef Client Service',
+      service_type: 'own process',
+      current_state: 'running',
+      controls_accepted: [],
+      win32_exit_code: 1077,
+      service_specific_exit_code: 0,
+      check_point: 0,
+      wait_hint: 0,
+      binary_path_name: 'C:\\opscode\\chef\\embedded\\bin\\ruby.exe C:\\opscode\\chef\\bin\\chef-windows-service',
+      start_type: 'auto start',
+      error_control: 'ignore',
+      load_order_group: '',
+      tag_id: 0,
+      start_name: 'LocalSystem',
+      dependencies: ['Winmgmt'],
+      description: 'Runs Chef Client on regular, configurable intervals.',
+      interactive: false,
+      pid: 0,
+      service_flags: 0,
+      reset_period: 0,
+      reboot_message: nil,
+      command: nil,
+      num_actions: 0,
+      actions: nil,
+      delayed_start: 1
+    )
+  end
+
   let(:provider) do
     prvdr = Chef::Provider::Service::Windows.new(new_resource,
       Chef::RunContext.new(Chef::Node.new, {}, Chef::EventDispatch::Dispatcher.new))
