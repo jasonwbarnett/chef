@@ -446,6 +446,55 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
   end
 
   describe Chef::Provider::Service::Windows, "converge_delayed_start" do
+    before do
+      allow(Win32::Service).to receive(:configure).and_return(true)
+    end
+
+    it "works around #6300 if delayed_start is default" do
+      new_resource.delayed_start = new_resource.class.properties[:delayed_start].default
+      expect(provider.new_resource).to receive(:delayed_start=)
+        .with(new_resource.class.properties[:delayed_start].default)
+      provider.send(:converge_delayed_start)
+    end
+
+    context "delayed start needs to be updated" do
+      before do
+        provider.current_resource.delayed_start = false
+        provider.new_resource.delayed_start = true
+      end
+
+      it "configures delayed start" do
+        expect(Win32::Service).to receive(:configure)
+        provider.send(:converge_delayed_start)
+      end
+
+      it "configures delayed start with correct params" do
+        expect(Win32::Service).to receive(:configure).with(service_name: chef_service_name, delayed_start: 1)
+        provider.send(:converge_delayed_start)
+      end
+
+      it "converges resource" do
+        provider.send(:converge_delayed_start)
+        expect(provider.resource_updated?).to be true
+      end
+    end
+
+    context "delayed start does not need to be updated" do
+      before do
+        provider.current_resource.delayed_start = false
+        provider.new_resource.delayed_start = false
+      end
+
+      it "does not configure delayed start" do
+        expect(Win32::Service).to_not receive(:configure)
+        provider.send(:converge_delayed_start)
+      end
+
+      it "does not converge" do
+        provider.send(:converge_delayed_start)
+        expect(provider.resource_updated?).to be false
+      end
+    end
   end
 
   describe Chef::Provider::Service::Windows, "start_service" do
