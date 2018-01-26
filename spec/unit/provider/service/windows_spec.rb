@@ -371,9 +371,6 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
       before do
         allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(true)
         allow(Win32::Service).to receive(:configure).with(anything).and_return(true)
-
-        provider.current_resource.binary_path_name = chef_service_binary_path_name
-        provider.new_resource.binary_path_name = chef_service_binary_path_name
       end
 
       it "works around #6300 if run_as_user is default" do
