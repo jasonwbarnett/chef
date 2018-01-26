@@ -366,31 +366,14 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
     end
   end
 
-  # action :configure do
-  #   unless Win32::Service.exists?(new_resource.service_name)
-  #     Chef::Log.debug "#{new_resource} does not exist - nothing to do"
-  #     return
-  #   end
-  #
-  #   # Until #6300 is solved this is required
-  #   if new_resource.run_as_user == new_resource.class.properties[:run_as_user].default
-  #     new_resource.run_as_user = new_resource.class.properties[:run_as_user].default
-  #   end
-  #
-  #   converge_if_changed :service_type, :startup_type, :error_control,
-  #                       :binary_path_name, :load_order_group, :dependencies,
-  #                       :run_as_user, :display_name do
-  #     Win32::Service.configure(windows_service_config(:configure))
-  #   end
-  #
-  #   converge_delayed_start
-  # end
-
   describe Chef::Provider::Service::Windows, "action_configure" do
     context "service exists" do
       before do
         allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(true)
         allow(Win32::Service).to receive(:configure).with(anything).and_return(true)
+
+        provider.current_resource.binary_path_name = chef_service_binary_path_name
+        provider.new_resource.binary_path_name = chef_service_binary_path_name
       end
 
       it "works around #6300 if run_as_user is default" do
@@ -400,11 +383,35 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
         provider.action_configure
       end
 
-      it "configures service" do
-        provider.current_resource.run_as_user = "old.user"
-        provider.current_resource.binary_path_name = chef_service_binary_path_name
-        provider.new_resource.run_as_user = "new.user"
-        provider.new_resource.binary_path_name = chef_service_binary_path_name
+      # configures service if service_type has changed (FAILED - 1)
+      # configures service if startup_type has changed (FAILED - 2)
+      # configures service if error_control has changed (FAILED - 3)
+      # Attributes that are Strings
+      %i(binary_path_name load_order_group dependencies run_as_user
+         display_name).each do |attr|
+        it "configures service if #{attr} has changed" do
+          provider.current_resource.send("#{attr}=", "old value")
+          provider.new_resource.send("#{attr}=", "new value")
+
+          expect(Win32::Service).to receive(:configure)
+          provider.action_configure
+        end
+      end
+
+      # Attributes that are Integers
+      %i(service_type error_control).each do |attr|
+        it "configures service if #{attr} has changed" do
+          provider.current_resource.send("#{attr}=", 1)
+          provider.new_resource.send("#{attr}=", 2)
+
+          expect(Win32::Service).to receive(:configure)
+          provider.action_configure
+        end
+      end
+
+      it "configures service if startup_type has changed" do
+        provider.current_resource.startup_type = :automatic
+        provider.new_resource.startup_type = :manual
 
         expect(Win32::Service).to receive(:configure)
         provider.action_configure
@@ -442,6 +449,9 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
         provider.action_configure
       end
     end
+  end
+
+  describe Chef::Provider::Service::Windows, "converge_delayed_start" do
   end
 
   describe Chef::Provider::Service::Windows, "start_service" do
