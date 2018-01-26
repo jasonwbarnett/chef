@@ -78,12 +78,10 @@ class Chef
       # 1 == delayed start is enabled
       # 0 == NO delayed start
       property :delayed_start, [TrueClass, FalseClass, Integer], default: false, coerce: proc { |x|
-        if x.is_a?(TrueClass)
-          1
-        elsif x.is_a?(FalseClass)
-          0
-        elsif x.is_a?(Integer)
-          x.zero? ? 0 : 1
+        if x.is_a?(Integer)
+          x.zero? ? false : true
+        else
+          x
         end
       }
 

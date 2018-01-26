@@ -75,7 +75,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
       current_resource.dependencies(config_info.dependencies)         if config_info.dependencies
       current_resource.run_as_user(config_info.service_start_name)    if config_info.service_start_name
       current_resource.display_name(config_info.display_name)         if config_info.display_name
-      current_resource.delayed_start(delayed_start_enabled?)
+      current_resource.delayed_start(current_delayed_start)           if current_delayed_start
     end
 
     current_resource
@@ -296,17 +296,11 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
 
   private
 
-  def delayed_start_enabled?
-    current_delayed_start == 1
-  end
-
   def current_delayed_start
     if service = Win32::Service.services.find { |x| x.service_name == new_resource.service_name }
-      # delayed_start is either 0 (no delayed start) or 1 (delayed start)
-      service.delayed_start
+      service.delayed_start.zero? ? false : true
     else
-      # If service is not found fallback to not delayed start (0)
-      0
+      nil
     end
   end
 
@@ -408,7 +402,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
   def converge_delayed_start
     config = {}
     config[:service_name]  = new_resource.service_name
-    config[:delayed_start] = new_resource.delayed_start
+    config[:delayed_start] = new_resource.delayed_start ? 1 : 0
 
     # Until #6300 is solved this is required
     if new_resource.delayed_start == new_resource.class.properties[:delayed_start].default
