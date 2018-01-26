@@ -380,9 +380,6 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
         provider.action_configure
       end
 
-      # configures service if service_type has changed (FAILED - 1)
-      # configures service if startup_type has changed (FAILED - 2)
-      # configures service if error_control has changed (FAILED - 3)
       # Attributes that are Strings
       %i(binary_path_name load_order_group dependencies run_as_user
          display_name).each do |attr|
