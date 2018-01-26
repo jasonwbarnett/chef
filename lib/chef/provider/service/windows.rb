@@ -193,7 +193,10 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
   end
 
   action :create do
-    return if Win32::Service.exists?(new_resource.service_name)
+    if Win32::Service.exists?(new_resource.service_name)
+      Chef::Log.debug "#{new_resource} already exists - nothing to do"
+      return
+    end
 
     converge_by("create service #{new_resource.service_name}") do
       Win32::Service.new(windows_service_config)
@@ -203,7 +206,10 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
   end
 
   action :delete do
-    return unless Win32::Service.exists?(new_resource.service_name)
+    unless Win32::Service.exists?(new_resource.service_name)
+      Chef::Log.debug "#{new_resource} does not exist - nothing to do"
+      return
+    end
 
     converge_by("delete service #{new_resource.service_name}") do
       Win32::Service.delete(new_resource.service_name)

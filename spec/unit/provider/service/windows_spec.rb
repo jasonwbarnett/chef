@@ -29,12 +29,15 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
   let(:new_resource) { Chef::Resource::WindowsService.new(chef_service_name) }
 
   # Actual response from Win32::Service.config_info('chef-client')
+  let(:chef_service_binary_path_name) do
+    'C:\\opscode\\chef\\embedded\\bin\\ruby.exe C:\\opscode\\chef\\bin\\chef-windows-service'
+  end
   let(:chef_service_config_info) do
     double('Struct::ServiceConfigInfo',
       service_type: 'own process',
       start_type: 'auto start',
       error_control: 'ignore',
-      binary_path_name: 'C:\\opscode\\chef\\embedded\\bin\\ruby.exe C:\\opscode\\chef\\bin\\chef-windows-service',
+      binary_path_name: chef_service_binary_path_name,
       load_order_group: '',
       tag_id: 0,
       dependencies: ['Winmgmt'],
@@ -55,7 +58,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
       service_specific_exit_code: 0,
       check_point: 0,
       wait_hint: 0,
-      binary_path_name: 'C:\\opscode\\chef\\embedded\\bin\\ruby.exe C:\\opscode\\chef\\bin\\chef-windows-service',
+      binary_path_name: chef_service_binary_path_name,
       start_type: 'auto start',
       error_control: 'ignore',
       load_order_group: '',
@@ -256,34 +259,68 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
     end
   end
 
-  # current_resource.service_name(new_resource.service_name) // DONE
-  #
-  # if Win32::Service.exists?(current_resource.service_name)
-  #   current_resource.running(current_state == RUNNING)
-  #   Chef::Log.debug "#{new_resource} running: #{current_resource.running}"
-  #   case current_start_type
-  #   when AUTO_START
-  #     current_resource.enabled(true)
-  #   when DISABLED
-  #     current_resource.enabled(false)
-  #   end
-  #   Chef::Log.debug "#{new_resource} enabled: #{current_resource.enabled}"
-  #
-  #   config_info = Win32::Service.config_info(current_resource.service_name)
-  #   current_resource.service_type(get_service_type(config_info.service_type))    if config_info.service_type
-  #   current_resource.startup_type(get_start_type(config_info.start_type))        if config_info.start_type
-  #   current_resource.error_control(get_error_control(config_info.error_control)) if config_info.error_control
-  #   current_resource.binary_path_name(config_info.binary_path_name) if config_info.binary_path_name
-  #   current_resource.load_order_group(config_info.load_order_group) if config_info.load_order_group
-  #   current_resource.dependencies(config_info.dependencies)         if config_info.dependencies
-  #   current_resource.run_as_user(config_info.service_start_name)    if config_info.service_start_name
-  #   current_resource.display_name(config_info.display_name)         if config_info.display_name
-  #
-  #   if delayed_start = current_delayed_start
-  #     current_resource.delayed_start(delayed_start)
-  #   end
-  # end
+  describe Chef::Provider::Service::Windows, "action_create" do
+    before do
+      provider.new_resource.binary_path_name = chef_service_binary_path_name
+    end
 
+    context "service already exists" do
+      before do
+        allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(true)
+      end
+
+      it "logs debug message" do
+        expect(Chef::Log).to receive(:debug).with("windows_service[#{chef_service_name}] already exists - nothing to do")
+        provider.action_create
+      end
+
+      it "does not converge" do
+        provider.action_create
+        expect(provider.resource_updated?).to be false
+      end
+    end
+
+    context "service does not exist" do
+      before do
+        allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(false)
+      end
+
+      it "converges resource" do
+        allow(Win32::Service).to receive(:new).with(anything).and_return(true)
+        provider.action_create
+        expect(provider.resource_updated?).to be true
+      end
+
+      it "creates service" do
+        expect(Win32::Service).to receive(:new).with(
+          service_name: chef_service_name,
+          service_type: 16,
+          start_type: 2,
+          error_control: 1,
+          binary_path_name: chef_service_binary_path_name,
+          service_start_name: 'LocalSystem',
+          desired_access: 983551,
+        )
+        provider.action_create
+      end
+    end
+  end
+
+  describe Chef::Provider::Service::Windows, "action_delete" do
+    context "service already exists" do
+    end
+
+    context "service does not exist" do
+    end
+  end
+
+  describe Chef::Provider::Service::Windows, "action_configure" do
+    context "service exists" do
+    end
+
+    context "service does not exist" do
+    end
+  end
 
   describe Chef::Provider::Service::Windows, "start_service" do
     before(:each) do
