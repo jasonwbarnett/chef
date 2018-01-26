@@ -249,13 +249,13 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
     it "sets delayed start to true if delayed start is enabled" do
       allow(chef_service_info).to receive(:delayed_start).and_return(1)
       provider.load_current_resource
-      expect(provider.current_resource.delayed_start).to be true
+      expect(provider.current_resource.delayed_start).to be 1
     end
 
     it "sets delayed start to false if delayed start is disabled" do
       allow(chef_service_info).to receive(:delayed_start).and_return(0)
       provider.load_current_resource
-      expect(provider.current_resource.delayed_start).to be false
+      expect(provider.current_resource.delayed_start).to be 0
     end
   end
 

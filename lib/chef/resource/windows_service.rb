@@ -77,7 +77,15 @@ class Chef
       # This only applies if startup_type is :automatic
       # 1 == delayed start is enabled
       # 0 == NO delayed start
-      property :delayed_start, [true, false], default: false
+      property :delayed_start, [TrueClass, FalseClass, Integer], default: false, coerce: proc { |x|
+        if x.is_a?(TrueClass)
+          1
+        elsif x.is_a?(FalseClass)
+          0
+        elsif x.is_a?(Integer)
+          x.zero? ? 0 : 1
+        end
+      }
 
       # https://github.com/djberg96/win32-service/blob/ffi/lib/win32/windows/constants.rb#L43-L47
       property :error_control, Integer, default: SERVICE_ERROR_NORMAL
