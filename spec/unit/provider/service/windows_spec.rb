@@ -609,17 +609,17 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
   end
 
   describe Chef::Provider::Service::Windows, "action_configure_startup" do
-    { :automatic => "auto start", :manual => "demand start", :disabled => "disabled" }.each do |type, win32|
+    %i[automatic manual disabled].each do |type|
       it "sets the startup type to #{type} if it is something else" do
         new_resource.startup_type(type)
-        allow(provider).to receive(:current_start_type).and_return("fire")
+        allow(provider).to receive(:current_startup_type).and_return(:fire)
         expect(provider).to receive(:set_startup_type).with(type)
         provider.action_configure_startup
       end
 
       it "leaves the startup type as #{type} if it is already set" do
         new_resource.startup_type(type)
-        allow(provider).to receive(:current_start_type).and_return(win32)
+        allow(provider).to receive(:current_startup_type).and_return(type)
         expect(provider).not_to receive(:set_startup_type).with(type)
         provider.action_configure_startup
       end

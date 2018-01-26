@@ -28,9 +28,9 @@ class Chef
       include Chef::Win32ServiceConstants
 
       ALLOWED_START_TYPES = {
-        :automatic => SERVICE_AUTO_START,
-        :manual    => SERVICE_DEMAND_START,
-        :disabled  => SERVICE_DISABLED,
+        automatic: SERVICE_AUTO_START,
+        manual: SERVICE_DEMAND_START,
+        disabled: SERVICE_DISABLED,
       }
 
       # Until #1773 is resolved, you need to manually specify the windows_service resource
@@ -62,15 +62,16 @@ class Chef
       #   - :manual
       #   - :disabled
       # Reference: https://github.com/djberg96/win32-service/blob/ffi/lib/win32/windows/constants.rb#L49-L54
-      property :startup_type, [Integer, String, Symbol], default: SERVICE_AUTO_START, coerce: proc { |x|
+      property :startup_type, [Symbol], equal_to: [:automatic, :manual, :disabled], default: :automatic, coerce: proc { |x|
         if x.is_a?(Integer)
-          x
-        elsif x.is_a?(String) or x.is_a?(Symbol)
-          x = x.to_sym
-          ALLOWED_START_TYPES.fetch(x) do
+          ALLOWED_START_TYPES.invert.fetch(x) do
             Chef::Log.warn("Unsupported startup_type #{x}, falling back to :automatic")
-            SERVICE_AUTO_START
+            :automatic
           end
+        elsif x.is_a?(String)
+          x.to_sym
+        else
+          x
         end
       }
 
