@@ -178,7 +178,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
         ))
     end
 
-    context 'start type is neither AUTO START or DISABLED' do
+    context 'startup_type is neither :automatic or :disabled' do
       before do
         allow(Win32::Service).to receive(:config_info).with(new_resource.service_name).and_return(
           double("Struct::ServiceConfigInfo",
