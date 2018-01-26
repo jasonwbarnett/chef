@@ -283,15 +283,20 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
         expect(Win32::Service).to_not receive(:new)
         provider.action_create
       end
+
+      it "does not call converge_delayed_start" do
+        expect(provider).to_not receive(:converge_delayed_start)
+        provider.action_create
+      end
     end
 
     context "service does not exist" do
       before do
         allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(false)
+        allow(Win32::Service).to receive(:new).with(anything).and_return(true)
       end
 
       it "converges resource" do
-        allow(Win32::Service).to receive(:new).with(anything).and_return(true)
         provider.action_create
         expect(provider.resource_updated?).to be true
       end
@@ -311,6 +316,11 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
           service_start_name: 'LocalSystem',
           desired_access: 983551,
         )
+        provider.action_create
+      end
+
+      it "calls converge_delayed_start" do
+        expect(provider).to receive(:converge_delayed_start)
         provider.action_create
       end
     end
