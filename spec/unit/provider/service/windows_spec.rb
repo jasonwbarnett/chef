@@ -264,7 +264,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
       provider.new_resource.binary_path_name = chef_service_binary_path_name
     end
 
-    context "service already exists" do
+    context "service exists" do
       before do
         allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(true)
       end
@@ -277,6 +277,11 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
       it "does not converge" do
         provider.action_create
         expect(provider.resource_updated?).to be false
+      end
+
+      it "does not create service" do
+        expect(Win32::Service).to_not receive(:new)
+        provider.action_create
       end
     end
 
@@ -292,6 +297,11 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
       end
 
       it "creates service" do
+        expect(Win32::Service).to receive(:new)
+        provider.action_create
+      end
+
+      it "creates service with correct configuration" do
         expect(Win32::Service).to receive(:new).with(
           service_name: chef_service_name,
           service_type: 16,
@@ -307,10 +317,42 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
   end
 
   describe Chef::Provider::Service::Windows, "action_delete" do
-    context "service already exists" do
+    context "service exists" do
+      before do
+        allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(true)
+        allow(Win32::Service).to receive(:delete).with(chef_service_name).and_return(true)
+      end
+
+      it "converges resource" do
+        provider.action_delete
+        expect(provider.resource_updated?).to be true
+      end
+
+      it "deletes service" do
+        expect(Win32::Service).to receive(:delete).with(chef_service_name)
+        provider.action_delete
+      end
     end
 
     context "service does not exist" do
+      before do
+        allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(false)
+      end
+
+      it "logs debug message" do
+        expect(Chef::Log).to receive(:debug).with("windows_service[#{chef_service_name}] does not exist - nothing to do")
+        provider.action_delete
+      end
+
+      it "does not converge" do
+        provider.action_delete
+        expect(provider.resource_updated?).to be false
+      end
+
+      it "does not delete service" do
+        expect(Win32::Service).to_not receive(:delete)
+        provider.action_delete
+      end
     end
   end
 
