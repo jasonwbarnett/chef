@@ -218,7 +218,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
 
   action :configure do
     unless Win32::Service.exists?(new_resource.service_name)
-      Chef::Log.debug "#{new_resource} does not exist - nothing to do"
+      Chef::Log.warn "#{new_resource} does not exist. Maybe you need to prepend action :create"
       return
     end
 

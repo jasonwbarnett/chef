@@ -366,11 +366,66 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
     end
   end
 
+  #   action :configure do
+  #   unless Win32::Service.exists?(new_resource.service_name)
+  #     Chef::Log.debug "#{new_resource} does not exist - nothing to do"
+  #     return
+  #   end
+  #
+  #   # Until #6300 is solved this is required
+  #   if new_resource.run_as_user == new_resource.class.properties[:run_as_user].default
+  #     new_resource.run_as_user = new_resource.class.properties[:run_as_user].default
+  #   end
+  #
+  #   converge_if_changed :service_type, :startup_type, :error_control,
+  #                       :binary_path_name, :load_order_group, :dependencies,
+  #                       :run_as_user, :display_name do
+  #     Win32::Service.configure(windows_service_config(:configure))
+  #   end
+  #
+  #   converge_delayed_start
+  # end
+
   describe Chef::Provider::Service::Windows, "action_configure" do
     context "service exists" do
+      before do
+        allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(true)
+        allow(Win32::Service).to receive(:configure).with(anything).and_return(true)
+      end
+
+
+
+      it "calls converge_delayed_start" do
+        expect(provider).to receive(:converge_delayed_start)
+        provider.action_configure
+      end
     end
 
     context "service does not exist" do
+      before do
+        allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(false)
+      end
+
+      it "logs warning" do
+        expect(Chef::Log).to receive(:warn)
+          .with("windows_service[#{chef_service_name}] does not exist. Maybe you need to prepend action :create")
+        provider.action_configure
+      end
+
+      it "does not converge" do
+        provider.action_configure
+        expect(provider.resource_updated?).to be false
+      end
+
+      it "does not convigure service" do
+        expect(Win32::Service).to_not receive(:configure)
+        provider.action_configure
+      end
+
+      it "does not call converge_delayed_start" do
+        expect(provider).to_not receive(:converge_delayed_start)
+        provider.action_configure
+      end
     end
   end
 
