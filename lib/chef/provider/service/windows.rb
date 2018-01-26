@@ -295,8 +295,7 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
   end
 
   def current_delayed_start
-    services = Win32::Service.services
-    if service = services.find { |x| x.service_name == new_resource.service_name }
+    if service = Win32::Service.services.find { |x| x.service_name == new_resource.service_name }
       # delayed_start is either 0 (no delayed start) or 1 (delayed start)
       service.delayed_start
     else
