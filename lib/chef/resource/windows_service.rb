@@ -91,7 +91,10 @@ class Chef
 
       # The fully qualified path to the service binary file. The path can also
       # include arguments for an auto-start service.
-      property :binary_path_name, String, required: true
+      #
+      # This is required for :create and :configure actions -- intentionally
+      # not setting required: true here to support other actions
+      property :binary_path_name, String
 
       # The names of the load ordering group of which this service is a member.
       # Specify nil or an empty string if the service does not belong to a group.
