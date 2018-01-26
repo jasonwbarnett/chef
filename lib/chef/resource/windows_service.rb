@@ -77,7 +77,7 @@ class Chef
       # This only applies if startup_type is :automatic
       # 1 == delayed start is enabled
       # 0 == NO delayed start
-      property :delayed_start, [TrueClass, FalseClass, Integer], default: false, coerce: proc { |x|
+      property :delayed_start, [TrueClass, FalseClass], default: false, coerce: proc { |x|
         if x.is_a?(Integer)
           x.zero? ? false : true
         else
