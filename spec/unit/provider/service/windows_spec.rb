@@ -366,7 +366,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
     end
   end
 
-  #   action :configure do
+  # action :configure do
   #   unless Win32::Service.exists?(new_resource.service_name)
   #     Chef::Log.debug "#{new_resource} does not exist - nothing to do"
   #     return
@@ -393,7 +393,22 @@ describe Chef::Provider::Service::Windows, "load_current_resource" do
         allow(Win32::Service).to receive(:configure).with(anything).and_return(true)
       end
 
+      it "works around #6300 if run_as_user is default" do
+        new_resource.run_as_user = new_resource.class.properties[:run_as_user].default
+        expect(provider.new_resource).to receive(:run_as_user=)
+          .with(new_resource.class.properties[:run_as_user].default)
+        provider.action_configure
+      end
 
+      it "configures service" do
+        provider.current_resource.run_as_user = "old.user"
+        provider.current_resource.binary_path_name = chef_service_binary_path_name
+        provider.new_resource.run_as_user = "new.user"
+        provider.new_resource.binary_path_name = chef_service_binary_path_name
+
+        expect(Win32::Service).to receive(:configure)
+        provider.action_configure
+      end
 
       it "calls converge_delayed_start" do
         expect(provider).to receive(:converge_delayed_start)
