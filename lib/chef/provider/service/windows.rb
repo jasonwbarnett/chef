@@ -352,17 +352,6 @@ class Chef::Provider::Service::Windows < Chef::Provider::Service
     end
   end
 
-  # @param int [Integer]
-  # @return [Symbol]
-  # @raise [Chef::Exceptions::ConfigurationError] if the startup int is
-  #   not supported.
-  # @see Chef::Resource::WindowsService::ALLOWED_START_TYPES
-  def startup_int_to_type(int)
-    Chef::Resource::WindowsService::ALLOWED_START_TYPES.invert.fetch(int) do
-      raise Chef::Exceptions::ConfigurationError, "#{@new_resource.name}: Startup int '#{int}' is not supported"
-    end
-  end
-
   # Takes Win32::Service start_types
   def set_startup_type(type)
     startup_type = startup_type_to_int(type)
