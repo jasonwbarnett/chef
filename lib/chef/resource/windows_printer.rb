@@ -63,16 +63,24 @@ class Chef
       property :exists, [TrueClass, FalseClass],
                skip_docs: true
 
-      PRINTERS_REG_KEY = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Print\Printers\\'.freeze unless defined?(PRINTERS_REG_KEY)
+      PRINTING_ADMIN_SCRIPTS_DIR = 'C:\\windows\\system32\\Printing_Admin_Scripts\\en-US'.freeze unless defined?(PRINTING_ADMIN_SCRIPTS_DIR)
+      # & cscript .\prnmngr.vbs -l
+
+      def printers
+        so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnmngr.vbs\" -l")
+        printers = []
+        so.stdout.each_line do |line|
+          printer << line[/Printer name (.*)$/, 1] if line =~ /^Printer name /
+        end
+        printers
+      end
 
       # does the printer exist
       #
       # @param [String] name the name of the printer
       # @return [Boolean]
       def printer_exists?(name)
-        printer_reg_key = PRINTERS_REG_KEY + name
-        logger.trace "Checking to see if this reg key exists: '#{printer_reg_key}'"
-        registry_key_exists?(printer_reg_key)
+        printers.include?(name)
       end
 
       # @todo Set @current_resource printer properties from registry
