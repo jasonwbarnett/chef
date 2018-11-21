@@ -45,8 +45,16 @@ describe Chef::Resource::WindowsPrinterPort do
     expect(resource.snmp_enabled).to eql(false)
   end
 
-  it "port_protocol property defaults to 1" do
-    expect(resource.port_protocol).to eql(1)
+  it "port_protocol property defaults to :raw" do
+    expect(resource.port_protocol).to eql(:raw)
+  end
+
+  it "converts port_protocol 1 to :raw" do
+    expect(resource.port_protocol 1).to eq(:raw)
+  end
+
+  it "converts port_protocol 2 to :lpr" do
+    expect(resource.port_protocol 2).to eq(:lpr)
   end
 
   it "raises an error if port_protocol isn't in 1 or 2" do
