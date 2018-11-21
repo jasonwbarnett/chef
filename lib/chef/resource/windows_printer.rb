@@ -123,41 +123,6 @@ class Chef
         ipv4_address cfg[/Port name IP_([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/, 1]
       end
 
-      # property :device_id, String,
-      # property :comment, String,
-      # property :default, [TrueClass, FalseClass],
-      # property :driver_name, String,
-      # property :location, String,
-      # property :shared, [TrueClass, FalseClass],
-      # property :share_name, String,
-      # property :ipv4_address, String,
-      # property :exists, [TrueClass, FalseClass]
-
-      # PS C:\windows\system32\Printing_Admin_Scripts\en-US> & cscript .\prncnfg.vbs -g -p "HP LaserJet 5th Floor"
-      # Microsoft (R) Windows Script Host Version 5.8
-      # Copyright (C) Microsoft Corporation. All rights reserved.
-      #
-      # Server name
-      # Printer name HP LaserJet 5th Floor
-      # Share name jason
-      # Driver name Dell 1130 Laser Printer
-      # Port name IP_10.4.64.38
-      # Comment
-      # Location
-      # Separator file
-      # Print processor winprint
-      # Data type RAW
-      # Parameters
-      # Priority 1
-      # Default priority 0
-      # Printer always available
-      # Attributes local shared default do_complete_first
-      #
-      # Printer status Idle
-      # Extended printer status Unknown
-      # Detected error state Unknown
-      # Extended detected error state Unknown
-
       action :create do
         description "Create a new printer and a printer port if one doesn't already exist."
 
