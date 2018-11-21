@@ -37,7 +37,8 @@ class Chef
                description: "An optional property for the IPv4 address of the printer if it differs from the resource block's name."
 
       property :port_name, String,
-               description: "The port name."
+               description: "The port name.",
+               default: lazy { "IP_#{ipv4_address}" }
 
       property :port_number, Integer,
                description: "The port number.",
@@ -50,29 +51,54 @@ class Chef
                description: "Determines if SNMP is enabled on the port.",
                default: false
 
-      property :port_protocol, Integer,
-               description: "The printer port protocol: 1 (RAW) or 2 (LPR).",
-               validation_message: "port_protocol must be either 1 for RAW or 2 for LPR!",
-               default: 1, equal_to: [1, 2]
+      property :port_protocol, Symbol,
+               description: "The printer port protocol: :raw or :lpr",
+               validation_message: "port_protocol must be either :raw or :lpr",
+               default: :raw, equal_to: [:raw, :lpr],
+               coerce: proc { |x|
+                 if x.is_a?(String)
+                   x.to_sym
+                 elsif x.is_a?(Integer)
+                   if x == 1
+                     :raw
+                   elsif x ==2
+                     :lpr
+                   else
+                     x
+                   end
+                 else
+                   x
+                 end
+               }
 
-      property :exists, [TrueClass, FalseClass],
-               skip_docs: true
+      PRINTING_ADMIN_SCRIPTS_DIR = 'C:\\windows\\system32\\Printing_Admin_Scripts\\en-US'.freeze unless defined?(PRINTING_ADMIN_SCRIPTS_DIR)
 
-      PORTS_REG_KEY = 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Print\Monitors\Standard TCP/IP Port\Ports\\'.freeze unless defined?(PORTS_REG_KEY)
+      def port_names
+        so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnport.vbs\" -l")
+        port_names = []
+        so.stdout.encode(universal_newline: true).each_line do |line|
+          port_names << line[/Port name (.+)$/, 1] if line =~ /^Port name .+$/
+        end
+        port_names
+      end
 
-      def port_exists?(name)
-        port_reg_key = PORTS_REG_KEY + name
+      def port_configuration
+        so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnport.vbs\" -g -r \"#{port_name}\"")
+        so.stdout.encode(universal_newline: true)
+      end
 
-        logger.trace "Checking to see if this reg key exists: '#{port_reg_key}'"
-        registry_key_exists?(port_reg_key)
+      def port_exists?
+        port_names.include?(port_name)
       end
 
       # @todo Set @current_resource port properties from registry
       load_current_value do |desired|
+        current_value_does_not_exist! unless port_exists?
+
         name desired.name
         ipv4_address desired.ipv4_address
-        port_name desired.port_name || "IP_#{desired.ipv4_address}"
-        exists port_exists?(desired.port_name || "IP_#{desired.ipv4_address}")
+        port_name desired.port_name
+        exists port_exists?
       end
 
       action :create do
@@ -101,8 +127,6 @@ class Chef
 
       action_class do
         def create_printer_port
-          port_name = new_resource.port_name || "IP_#{new_resource.ipv4_address}"
-
           # create the printer port using PowerShell
           declare_resource(:powershell_script, "Creating printer port #{new_resource.port_name}") do
             code <<-EOH
@@ -110,7 +134,7 @@ class Chef
               Set-WmiInstance -class Win32_TCPIPPrinterPort `
                 -EnableAllPrivileges `
                 -Argument @{ HostAddress = "#{new_resource.ipv4_address}";
-                            Name        = "#{port_name}";
+                            Name        = "#{new_resource.port_name}";
                             Description = "#{new_resource.port_description}";
                             PortNumber  = "#{new_resource.port_number}";
                             Protocol    = "#{new_resource.port_protocol}";
@@ -121,11 +145,9 @@ class Chef
         end
 
         def delete_printer_port
-          port_name = new_resource.port_name || "IP_#{new_resource.ipv4_address}"
-
           declare_resource(:powershell_script, "Deleting printer port: #{new_resource.port_name}") do
             code <<-EOH
-              $port = Get-WMIObject -class Win32_TCPIPPrinterPort -EnableAllPrivileges -Filter "name = '#{port_name}'"
+              $port = Get-WMIObject -class Win32_TCPIPPrinterPort -EnableAllPrivileges -Filter "name = '#{new_resource.port_name}'"
               $port.Delete()
             EOH
           end
