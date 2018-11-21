@@ -69,11 +69,26 @@ class Chef
         so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnmngr.vbs\" -l")
         printers = []
         so.stdout.each_line do |line|
-          printer << line[/Printer name (.*)$/, 1] if line =~ /^Printer name /
+          printer << line[/Printer name (.+)$/, 1] if line =~ /^Printer name .+$/
         end
         printers
       end
 
+      #
+      # Current printer configuration
+      #
+      # @return [String] printer configuration
+      #
+      def printer_config
+        so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prncnfg.vbs\" -g -p \"#{name}\"")
+        so.stdout.encode(universal_newline: true)
+      end
+
+      #
+      # Name of the default printer
+      #
+      # @return [String] default printer name
+      #
       def default_printer
         # PS C:\windows\system32\Printing_Admin_Scripts\en-US> & cscript .\prnmngr.vbs -g
         # Microsoft (R) Windows Script Host Version 5.8
@@ -81,22 +96,67 @@ class Chef
         #
         # The default printer is HP LaserJet 5th Floor
         so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnmngr.vbs\" -g")
-        so.stdout[/The default printer is (.*)$/, 1]
+        so.stdout.encode(universal_newline: true)[/The default printer is (.+)$/, 1]
       end
 
-      # does the printer exist
+      #
+      # Does the printer exist or not
       #
       # @param [String] name the name of the printer
       # @return [Boolean]
-      def printer_exists?(name)
+      #
+      def printer_exists?
         printer_names.include?(name)
       end
 
-      # @todo Set @current_resource printer properties from registry
       load_current_value do |desired|
-        name desired.name
-        exists printer_exists?(desired.name)
+        current_value_does_not_exist! unless printer_exists?
+
+        cfg = printer_config
+
+        driver_name  cfg[/^Driver name (.+)$/, 1]
+        comment      cfg[/^Comment (.+)$/, 1]
+        default      default_printer == desired.name
+        share_name   cfg[/^Share name (.+)$/, 1]
+        shared       !!(stdout =~ /^Attributes.*shared/)
+        location     cfg[/^Location (.+)$/, 1]
+        ipv4_address cfg[/Port name IP_([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/, 1]
       end
+
+      # property :device_id, String,
+      # property :comment, String,
+      # property :default, [TrueClass, FalseClass],
+      # property :driver_name, String,
+      # property :location, String,
+      # property :shared, [TrueClass, FalseClass],
+      # property :share_name, String,
+      # property :ipv4_address, String,
+      # property :exists, [TrueClass, FalseClass]
+
+      # PS C:\windows\system32\Printing_Admin_Scripts\en-US> & cscript .\prncnfg.vbs -g -p "HP LaserJet 5th Floor"
+      # Microsoft (R) Windows Script Host Version 5.8
+      # Copyright (C) Microsoft Corporation. All rights reserved.
+      #
+      # Server name
+      # Printer name HP LaserJet 5th Floor
+      # Share name jason
+      # Driver name Dell 1130 Laser Printer
+      # Port name IP_10.4.64.38
+      # Comment
+      # Location
+      # Separator file
+      # Print processor winprint
+      # Data type RAW
+      # Parameters
+      # Priority 1
+      # Default priority 0
+      # Printer always available
+      # Attributes local shared default do_complete_first
+      #
+      # Printer status Idle
+      # Extended printer status Unknown
+      # Detected error state Unknown
+      # Extended detected error state Unknown
 
       action :create do
         description "Create a new printer and a printer port if one doesn't already exist."
