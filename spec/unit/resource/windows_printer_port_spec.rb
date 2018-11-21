@@ -23,7 +23,8 @@ describe Chef::Resource::WindowsPrinterPort do
   let(:shell_out_result) { double("shellout", stdout: nil, stderr: nil, exitstatus: nil) }
 
   before do
-    allow(resource).to receive(:shell_out!).with("cscript.exe \"#{described_class::PRINTING_ADMIN_SCRIPTS_DIR}\\prnport.vbs\" -l").and_return(shell_out_result)
+    allow_any_instance_of(described_class).to receive(:shell_out!).with("cscript.exe \"#{described_class::PRINTING_ADMIN_SCRIPTS_DIR}\\prnport.vbs\" -l").and_return(shell_out_result)
+    allow_any_instance_of(described_class).to receive(:shell_out!).with("cscript.exe \"#{described_class::PRINTING_ADMIN_SCRIPTS_DIR}\\prnport.vbs\" -g -r \"#{resource.port_name}\"").and_return(shell_out_result)
   end
 
   it "sets resource name as :windows_printer_port" do
@@ -80,10 +81,22 @@ describe Chef::Resource::WindowsPrinterPort do
     expect { resource.port_protocol 3 }.to raise_error(ArgumentError)
   end
 
-  it "raises an error if ipv4_address isn't in X.X.X.X format" do
+  it "raises an error if ipv4_address isn't a valid IP Address" do
     expect { resource.ipv4_address "123.123.123.123" }.not_to raise_error
     expect { resource.ipv4_address "a.b.c.d" }.to raise_error(ArgumentError)
     expect { resource.ipv4_address "356.233.1.1" }.to raise_error(ArgumentError)
+  end
+
+  describe "#load_current_value!" do
+    it 'is nil when current value does not exist' do
+      allow_any_instance_of(described_class).to receive(:port_exists?).and_return false
+      provider.load_current_resource
+      expect(provider.current_resource).to be nil
+    end
+
+    it 'returns configuration' do
+      allow(shell_out_result).to receive(:stdout).and_return("Microsoft (R) Windows Script Host Version 5.8\r\nCopyright (C) Microsoft Corporation. All rights reserved.\r\n\r\n\r\nServer name \r\nPort name IP_10.4.64.38\r\nHost address 10.4.64.38\r\nProtocol RAW\r\nPort number 9100\r\nSNMP Disabled\r\n")
+    end
   end
 
   describe '#port_names' do
