@@ -19,8 +19,15 @@ require "spec_helper"
 
 describe Chef::Resource::WindowsPrinterPort do
   let(:ipv4_address) { "63.192.209.236" }
-  let(:resource) { Chef::Resource::WindowsPrinterPort.new(ipv4_address) }
+  let(:resource) { Chef::Resource::WindowsPrinterPort.new(ipv4_address, run_context) }
   let(:shell_out_result) { double("shellout", stdout: nil, stderr: nil, exitstatus: nil) }
+
+  let(:node) { Chef::Node.new }
+  let(:events) { Chef::EventDispatch::Dispatcher.new }
+  let(:run_context) { Chef::RunContext.new(node, {}, events) }
+
+  error_getting_port_config = "Microsoft (R) Windows Script Host Version 5.8\r\nCopyright (C) Microsoft Corporation. All rights reserved.\r\n\r\nUnable to get port Error 0x80041002 Not found \r\nOperation \r\nProvider Win32 Provider\r\nDescription The printer name is invalid. \r\n"
+  port_config = "Microsoft (R) Windows Script Host Version 5.8\r\nCopyright (C) Microsoft Corporation. All rights reserved.\r\n\r\n\r\nServer name \r\nPort name IP_10.4.64.38\r\nHost address 10.4.64.38\r\nProtocol RAW\r\nPort number 9100\r\nSNMP Disabled\r\n"
 
   before do
     allow_any_instance_of(described_class).to receive(:shell_out!).with("cscript.exe \"#{described_class::PRINTING_ADMIN_SCRIPTS_DIR}\\prnport.vbs\" -l").and_return(shell_out_result)
@@ -89,13 +96,7 @@ describe Chef::Resource::WindowsPrinterPort do
 
   describe "#load_current_value!" do
     it 'is nil when current value does not exist' do
-      allow_any_instance_of(described_class).to receive(:port_exists?).and_return false
-      provider.load_current_resource
-      expect(provider.current_resource).to be nil
-    end
-
-    it 'returns configuration' do
-      allow(shell_out_result).to receive(:stdout).and_return("Microsoft (R) Windows Script Host Version 5.8\r\nCopyright (C) Microsoft Corporation. All rights reserved.\r\n\r\n\r\nServer name \r\nPort name IP_10.4.64.38\r\nHost address 10.4.64.38\r\nProtocol RAW\r\nPort number 9100\r\nSNMP Disabled\r\n")
+      provider = resource.provider_for_action(:create)
     end
   end
 
