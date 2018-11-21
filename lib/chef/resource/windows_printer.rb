@@ -64,9 +64,8 @@ class Chef
                skip_docs: true
 
       PRINTING_ADMIN_SCRIPTS_DIR = 'C:\\windows\\system32\\Printing_Admin_Scripts\\en-US'.freeze unless defined?(PRINTING_ADMIN_SCRIPTS_DIR)
-      # & cscript .\prnmngr.vbs -l
 
-      def printers
+      def printer_names
         so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnmngr.vbs\" -l")
         printers = []
         so.stdout.each_line do |line|
@@ -75,12 +74,22 @@ class Chef
         printers
       end
 
+      def default_printer
+        # PS C:\windows\system32\Printing_Admin_Scripts\en-US> & cscript .\prnmngr.vbs -g
+        # Microsoft (R) Windows Script Host Version 5.8
+        # Copyright (C) Microsoft Corporation. All rights reserved.
+        #
+        # The default printer is HP LaserJet 5th Floor
+        so = shell_out!("cscript.exe \"#{PRINTING_ADMIN_SCRIPTS_DIR}\\prnmngr.vbs\" -g")
+        so.stdout[/The default printer is (.*)$/, 1]
+      end
+
       # does the printer exist
       #
       # @param [String] name the name of the printer
       # @return [Boolean]
       def printer_exists?(name)
-        printers.include?(name)
+        printer_names.include?(name)
       end
 
       # @todo Set @current_resource printer properties from registry
