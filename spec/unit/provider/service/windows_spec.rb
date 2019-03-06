@@ -96,6 +96,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
     Win32::Service::DEMAND_START = 0x00000003
     Win32::Service::DISABLED = 0x00000004
 
+    allow(Win32::Service).to receive(:start).with(any_args).and_return(Win32::Service)
     allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
       double("StatusStruct", current_state: "running"))
     allow(Win32::Service).to receive(:config_info).with(new_resource.service_name)
@@ -419,13 +420,18 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
     end
 
     context "service does not exist" do
+      let(:missing_service_warning_message) { "windows_service[#{chef_service_name}] does not exist. Maybe you need to prepend action :create" }
+
       before do
         allow(Win32::Service).to receive(:exists?).with(chef_service_name).and_return(false)
+
+        # This prevents warnings being logged during unit tests which adds to
+        # developer confusion when they aren't familiar with this specific test
+        allow(logger).to receive(:warn).with(missing_service_warning_message)
       end
 
       it "logs warning" do
-        expect(logger).to receive(:warn)
-          .with("windows_service[#{chef_service_name}] does not exist. Maybe you need to prepend action :create")
+        expect(logger).to receive(:warn).with(missing_service_warning_message)
         provider.action_configure
       end
 
@@ -505,24 +511,56 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
         double("StatusStruct", current_state: "running"))
     end
 
-    it "calls the start command if one is specified" do
-      new_resource.start_command "sc start #{chef_service_name}"
-      expect(provider).to receive(:shell_out!).with((new_resource.start_command).to_s).and_return("Starting custom service")
-      provider.start_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+    context "start_command is specified" do
+      let(:start_command) { "sc start #{chef_service_name}" }
+
+      before do
+        new_resource.start_command start_command
+        allow(provider).to receive(:shell_out!).with(start_command)
+      end
+
+      it "calls the specified start_command" do
+        expect(provider).to receive(:shell_out!).with(start_command)
+        provider.start_service
+      end
+
+      it "does not call Win32::Service.start" do
+        expect(Win32::Service).not_to receive(:start)
+        provider.start_service
+      end
+
+      it "is updated by last action" do
+        provider.start_service
+        expect(new_resource).to be_updated_by_last_action
+      end
     end
 
-    it "uses the built-in command if no start command is specified" do
-      expect(Win32::Service).to receive(:start).with(new_resource.service_name)
-      provider.start_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+    context "start_command is not specified" do
+      before do
+        expect(new_resource.start_command).to be_nil
+      end
+
+      it "uses the built-in command" do
+        expect(Win32::Service).to receive(:start).with(new_resource.service_name)
+        provider.start_service
+      end
+
+      it "does not shell out the start_command" do
+        expect(provider).not_to receive(:shell_out!)
+        provider.start_service
+      end
+
+      it "is updated by last action" do
+        provider.start_service
+        expect(new_resource).to be_updated_by_last_action
+      end
     end
 
     it "does nothing if the service does not exist" do
       allow(Win32::Service).to receive(:exists?).with(new_resource.service_name).and_return(false)
-      expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
+      expect(Win32::Service).not_to receive(:start)
       provider.start_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).not_to be_updated_by_last_action
     end
 
     it "does nothing if the service is running" do
@@ -531,7 +569,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
       provider.start_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).not_to be_updated_by_last_action
     end
 
     it "raises an error if the service is paused" do
@@ -540,7 +578,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
       expect { provider.start_service }.to raise_error( Chef::Exceptions::Service )
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).not_to be_updated_by_last_action
     end
 
     it "waits and continues if the service is in start_pending" do
@@ -551,7 +589,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
       provider.start_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).not_to be_updated_by_last_action
     end
 
     it "fails if the service is in stop_pending" do
@@ -560,7 +598,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
       expect { provider.start_service }.to raise_error( Chef::Exceptions::Service )
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).not_to be_updated_by_last_action
     end
 
     describe "running as a different account" do
@@ -604,20 +642,20 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       new_resource.stop_command "sc stop #{chef_service_name}"
       expect(provider).to receive(:shell_out!).with((new_resource.stop_command).to_s).and_return("Stopping custom service")
       provider.stop_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "uses the built-in command if no stop command is specified" do
       expect(Win32::Service).to receive(:stop).with(new_resource.service_name)
       provider.stop_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "does nothing if the service does not exist" do
       allow(Win32::Service).to receive(:exists?).with(new_resource.service_name).and_return(false)
       expect(Win32::Service).not_to receive(:stop).with(new_resource.service_name)
       provider.stop_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
     it "does nothing if the service is stopped" do
@@ -626,7 +664,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:stop).with(new_resource.service_name)
       provider.stop_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
     it "raises an error if the service is paused" do
@@ -635,7 +673,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
       expect { provider.stop_service }.to raise_error( Chef::Exceptions::Service )
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
     it "waits and continue if the service is in stop_pending" do
@@ -646,7 +684,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:stop).with(new_resource.service_name)
       provider.stop_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
     it "fails if the service is in start_pending" do
@@ -655,7 +693,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       provider.load_current_resource
       expect(Win32::Service).not_to receive(:stop).with(new_resource.service_name)
       expect { provider.stop_service }.to raise_error( Chef::Exceptions::Service )
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
     it "passes custom timeout to the stop command if provided" do
@@ -666,7 +704,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       Timeout.timeout(2) do
         expect { provider.stop_service }.to raise_error(Timeout::Error)
       end
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
   end
@@ -677,7 +715,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       new_resource.restart_command "sc restart"
       expect(provider).to receive(:shell_out!).with((new_resource.restart_command).to_s)
       provider.restart_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "stops then starts the service if it is running" do
@@ -689,7 +727,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       expect(Win32::Service).to receive(:stop).with(new_resource.service_name)
       expect(Win32::Service).to receive(:start).with(new_resource.service_name)
       provider.restart_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "just starts the service if it is stopped" do
@@ -699,7 +737,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
         double("StatusStruct", current_state: "running"))
       expect(Win32::Service).to receive(:start).with(new_resource.service_name)
       provider.restart_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "does nothing if the service does not exist" do
@@ -707,7 +745,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       expect(Win32::Service).not_to receive(:stop).with(new_resource.service_name)
       expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
       provider.restart_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
 
   end
@@ -721,14 +759,14 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
     it "enables service" do
       expect(Win32::Service).to receive(:configure).with(service_name: new_resource.service_name, start_type: Win32::Service::AUTO_START)
       provider.enable_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "does nothing if the service does not exist" do
       allow(Win32::Service).to receive(:exists?).with(new_resource.service_name).and_return(false)
       expect(Win32::Service).not_to receive(:configure)
       provider.enable_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
   end
 
@@ -773,14 +811,14 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
     it "disables service" do
       expect(Win32::Service).to receive(:configure)
       provider.disable_service
-      expect(new_resource.updated_by_last_action?).to be_truthy
+      expect(new_resource).to be_updated_by_last_action
     end
 
     it "does nothing if the service does not exist" do
       allow(Win32::Service).to receive(:exists?).with(new_resource.service_name).and_return(false)
       expect(Win32::Service).not_to receive(:configure)
       provider.disable_service
-      expect(new_resource.updated_by_last_action?).to be_falsey
+      expect(new_resource).to_not be_updated_by_last_action
     end
   end
 
