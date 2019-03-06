@@ -581,15 +581,30 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       expect(new_resource).not_to be_updated_by_last_action
     end
 
-    it "waits and continues if the service is in start_pending" do
-      allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
-        double("StatusStruct", current_state: "start pending"),
-        double("StatusStruct", current_state: "start pending"),
-        double("StatusStruct", current_state: "running"))
-      provider.load_current_resource
-      expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
-      provider.start_service
-      expect(new_resource).not_to be_updated_by_last_action
+    context "service is in start_pending" do
+      before do
+        allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
+          double("StatusStruct", current_state: "start pending"),
+          double("StatusStruct", current_state: "start pending"),
+          double("StatusStruct", current_state: "running"))
+        provider.load_current_resource
+      end
+
+      it "waits until service is running" do
+        expect(provider).to receive(:wait_for_state).with(Chef::Provider::Service::Windows::RUNNING)
+        provider.start_service
+      end
+
+      it "does not start service" do
+        expect(Win32::Service).not_to receive(:start)
+        expect(provider).not_to receive(:shell_out!)
+        provider.start_service
+      end
+
+      it "is not updated by last action" do
+        provider.start_service
+        expect(new_resource).not_to be_updated_by_last_action
+      end
     end
 
     it "fails if the service is in stop_pending" do
@@ -608,13 +623,11 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       end
 
       it "calls #grant_service_logon if the :run_as_user and :run_as_password properties are present" do
-        expect(Win32::Service).to receive(:start)
         expect(provider).to receive(:grant_service_logon).and_return(true)
         provider.start_service
       end
 
       it "does not grant user SeServiceLogonRight if it already has it" do
-        expect(Win32::Service).to receive(:start)
         expect(Chef::ReservedNames::Win32::Security).to receive(:get_account_right).with("wallace").and_return([service_right])
         expect(Chef::ReservedNames::Win32::Security).not_to receive(:add_account_right).with("wallace", service_right)
         provider.start_service
@@ -622,7 +635,6 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
 
       it "skips the rights check for LocalSystem" do
         new_resource.run_as_user("LocalSystem")
-        expect(Win32::Service).to receive(:start)
         expect(Chef::ReservedNames::Win32::Security).not_to receive(:get_account_right)
         expect(Chef::ReservedNames::Win32::Security).not_to receive(:add_account_right)
         provider.start_service
