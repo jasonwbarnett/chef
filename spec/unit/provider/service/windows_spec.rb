@@ -519,7 +519,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
         allow(provider).to receive(:shell_out!).with(start_command)
       end
 
-      it "calls the specified start_command" do
+      it "shells out the start_command" do
         expect(provider).to receive(:shell_out!).with(start_command)
         provider.start_service
       end
@@ -607,13 +607,27 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       end
     end
 
-    it "fails if the service is in stop_pending" do
-      allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
-        double("StatusStruct", current_state: "stop pending"))
-      provider.load_current_resource
-      expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
-      expect { provider.start_service }.to raise_error( Chef::Exceptions::Service )
-      expect(new_resource).not_to be_updated_by_last_action
+    context "service is in stop_pending" do
+      before do
+        allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
+          double("StatusStruct", current_state: "stop pending"))
+        provider.load_current_resource
+      end
+
+      it "raises error" do
+        expect { provider.start_service }.to raise_error( Chef::Exceptions::Service )
+      end
+
+      it "does not start service" do
+        expect(Win32::Service).not_to receive(:start)
+        expect(provider).not_to receive(:shell_out!)
+        allow { provider.start_service }.to raise_error(Chef::Exceptions::Service)
+      end
+
+      it "is not updated by last action" do
+        allow { provider.start_service }.to raise_error(Chef::Exceptions::Service)
+        expect(new_resource).not_to be_updated_by_last_action
+      end
     end
 
     describe "running as a different account" do
