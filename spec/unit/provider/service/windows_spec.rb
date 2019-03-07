@@ -572,13 +572,28 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       expect(new_resource).not_to be_updated_by_last_action
     end
 
-    it "raises an error if the service is paused" do
-      allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
-        double("StatusStruct", current_state: "paused"))
-      provider.load_current_resource
-      expect(Win32::Service).not_to receive(:start).with(new_resource.service_name)
-      expect { provider.start_service }.to raise_error( Chef::Exceptions::Service )
-      expect(new_resource).not_to be_updated_by_last_action
+    context "service is paused" do
+      before do
+        allow(Win32::Service).to receive(:status).with(new_resource.service_name).and_return(
+          double("StatusStruct", current_state: "paused"))
+        provider.load_current_resource
+        allow { provider.start_service }.to raise_error(Chef::Exceptions::Service)
+      end
+
+      it "raises error" do
+        expect { provider.start_service }.to raise_error(Chef::Exceptions::Service)
+      end
+
+      it "does not start service" do
+        expect(Win32::Service).not_to receive(:start)
+        expect(provider).not_to receive(:shell_out!)
+        allow { provider.start_service }.to raise_error(Chef::Exceptions::Service)
+      end
+
+      it "is not updated by last action" do
+        allow { provider.start_service }.to raise_error(Chef::Exceptions::Service)
+        expect(new_resource).not_to be_updated_by_last_action
+      end
     end
 
     context "service is in start_pending" do
@@ -615,7 +630,7 @@ describe Chef::Provider::Service::Windows, "load_current_resource", :windows_onl
       end
 
       it "raises error" do
-        expect { provider.start_service }.to raise_error( Chef::Exceptions::Service )
+        expect { provider.start_service }.to raise_error(Chef::Exceptions::Service)
       end
 
       it "does not start service" do
