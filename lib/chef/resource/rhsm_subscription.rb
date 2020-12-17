@@ -39,6 +39,16 @@ class Chef
           default_env true
           action :run
           not_if { subscription_attached?(new_resource.pool_id) }
+
+          notifies :run, "ruby_block[#{new_resource.pool_id} flushcache]", :immediately
+        end
+
+        ruby_block "#{new_resource.pool_id} flushcache" do
+          block do
+            PythonHelper.instance.reset
+          end
+
+          action :nothing
         end
       end
 
@@ -50,6 +60,16 @@ class Chef
           default_env true
           action :run
           only_if { subscription_attached?(new_resource.pool_id) }
+
+          notifies :run, "ruby_block[#{new_resource.pool_id} flushcache]", :immediately
+        end
+
+        ruby_block "#{new_resource.pool_id} flushcache" do
+          block do
+            PythonHelper.instance.reset
+          end
+
+          action :nothing
         end
       end
 
